@@ -2,35 +2,35 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Backtest Dashboard</title>
+  <title>Backtest Pro</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <div class="container">
-    <h1>📊 Strategy Backtest</h1>
+<div class="app">
 
-    <div class="controls">
-      <label>Select Days:</label>
-      <select id="days">
-        <option value="5">5</option>
-        <option value="10">10</option>
-        <option value="15">15</option>
-        <option value="20">20</option>
-        <option value="30" selected>30</option>
-      </select>
+  <h1>🚀 Strategy Dashboard</h1>
 
-      <button onclick="runBacktest()">Run</button>
-    </div>
+  <div class="controls">
+    <select id="days">
+      <option value="5">5 Days</option>
+      <option value="10">10 Days</option>
+      <option value="15">15 Days</option>
+      <option value="20">20 Days</option>
+      <option value="30" selected>30 Days</option>
+    </select>
 
-    <div id="summary"></div>
-    <div id="analysis"></div>
-
-    <h2>Trades</h2>
-    <div id="trades"></div>
-
+    <button onclick="run()">⚡ Run Backtest</button>
   </div>
 
-  <script src="app.js"></script>
+  <div id="stats"></div>
+  <div id="analysis"></div>
+
+  <h2>📦 Trades</h2>
+  <div id="trades"></div>
+
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
