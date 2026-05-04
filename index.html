@@ -100,8 +100,10 @@ async function run() {
   document.getElementById("stats").innerHTML = "Loading...";
   document.getElementById("debug").innerText = "";
 
-  const url = `https://backtest-only.vercel.app/api/backtest?days=${days}`;
+  const url = "https://api.allorigins.win/raw?url=" +
+  encodeURIComponent("https://backtest-only.vercel.app/api/backtest?days=" + days);
 
+fetch(url)
   log("Fetching: " + url);
 
   try {
