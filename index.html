@@ -15,7 +15,6 @@
 
     h1 {
       color: #00ffae;
-      font-size: 28px;
     }
 
     select, button {
@@ -23,7 +22,6 @@
       border-radius: 8px;
       border: none;
       margin: 5px;
-      font-size: 16px;
     }
 
     button {
@@ -36,12 +34,10 @@
       padding: 15px;
       border-radius: 12px;
       margin-top: 15px;
-      font-size: 14px;
     }
 
     .grid {
       display: grid;
-      grid-template-columns: 1fr;
       gap: 10px;
       margin-top: 15px;
     }
@@ -90,8 +86,8 @@ async function run() {
   document.getElementById("trades").innerHTML = "";
   document.getElementById("summary").innerHTML = "";
 
-  const url = "https://api.allorigins.win/raw?url=" +
-    encodeURIComponent("https://backtest-only.vercel.app/api/backtest?days=" + days);
+  // ✅ DIRECT API CALL (NO PROXY)
+  const url = "https://backtest-only.vercel.app/api/backtest?days=" + days;
 
   try {
     const res = await fetch(url);
@@ -101,21 +97,21 @@ async function run() {
 
     const trades = data.trades || [];
 
-    let totalWinPoints = 0;
-    let totalLossPoints = 0;
+    let winPoints = 0;
+    let lossPoints = 0;
     let equity = 0;
     let peak = 0;
     let maxDD = 0;
 
     trades.forEach(t => {
-      const points = Math.abs(t.exitPrice - t.entry);
+      const move = Math.abs(t.exitPrice - t.entry);
 
       if (t.exitType === "TP") {
-        totalWinPoints += points;
-        equity += points;
+        winPoints += move;
+        equity += move;
       } else {
-        totalLossPoints += points;
-        equity -= points;
+        lossPoints += move;
+        equity -= move;
       }
 
       if (equity > peak) peak = equity;
@@ -124,19 +120,19 @@ async function run() {
       if (dd > maxDD) maxDD = dd;
     });
 
-    const net = totalWinPoints - totalLossPoints;
+    const net = winPoints - lossPoints;
 
     document.getElementById("summary").innerHTML = `
       <div class="summary">
-        <b>Total:</b> ${data.total} |
-        <b>Wins:</b> ${data.wins} |
-        <b>Loss:</b> ${data.losses} |
-        <b>Winrate:</b> ${data.winrate}% <br><br>
+        Total: ${data.total} |
+        Wins: ${data.wins} |
+        Loss: ${data.losses} |
+        Winrate: ${data.winrate}% <br><br>
 
-        <b>Win Points:</b> ${totalWinPoints.toFixed(2)} <br>
-        <b>Loss Points:</b> ${totalLossPoints.toFixed(2)} <br>
-        <b>Net Points:</b> ${net.toFixed(2)} <br>
-        <b>Max Drawdown:</b> ${maxDD.toFixed(2)}
+        Win Points: ${winPoints.toFixed(2)} <br>
+        Loss Points: ${lossPoints.toFixed(2)} <br>
+        Net Points: ${net.toFixed(2)} <br>
+        Max Drawdown: ${maxDD.toFixed(2)}
       </div>
     `;
 
@@ -162,7 +158,7 @@ async function run() {
     });
 
   } catch (e) {
-    document.getElementById("loading").innerText = "Error loading data";
+    document.getElementById("loading").innerText = "❌ Error loading data";
     console.log(e);
   }
 }
