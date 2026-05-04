@@ -1,269 +1,124 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Backtest Pro</title>
+<meta charset="UTF-8" />
+<title>Backtest FIXED</title>
 
-  <style>
-    body {
-      margin: 0;
-      font-family: 'Segoe UI';
-      background: linear-gradient(135deg, #020617, #0f172a);
-      color: #e2e8f0;
-    }
+<style>
+body {
+  background:#0f172a;
+  color:white;
+  font-family:Arial;
+}
+.container {
+  max-width:900px;
+  margin:auto;
+  padding:20px;
+}
+button {
+  padding:10px;
+  background:#22c55e;
+  border:none;
+  color:white;
+}
+.card {
+  background:#1e293b;
+  padding:10px;
+  margin:10px 0;
+}
+.win { border-left:5px solid green; }
+.loss { border-left:5px solid red; }
+</style>
 
-    .app {
-      max-width: 1100px;
-      margin: auto;
-      padding: 20px;
-    }
-
-    h1 {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-
-    .controls {
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-
-    select, button {
-      padding: 10px;
-      border-radius: 10px;
-      border: none;
-    }
-
-    button {
-      background: linear-gradient(135deg, #22c55e, #16a34a);
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-bottom: 15px;
-    }
-
-    .stat {
-      background: #020617;
-      padding: 12px;
-      border-radius: 10px;
-      text-align: center;
-      border: 1px solid #1e293b;
-    }
-
-    .analysis {
-      margin-bottom: 20px;
-      padding: 15px;
-      background: #020617;
-      border-radius: 10px;
-      border: 1px solid #1e293b;
-    }
-
-    .card {
-      background: #020617;
-      border: 1px solid #1e293b;
-      border-radius: 14px;
-      padding: 14px;
-      margin-bottom: 10px;
-    }
-
-    .win {
-      border-left: 5px solid #22c55e;
-    }
-
-    .loss {
-      border-left: 5px solid #ef4444;
-    }
-
-    .error {
-      color: red;
-      text-align: center;
-      margin-top: 20px;
-    }
-  </style>
 </head>
-
 <body>
 
-<div class="app">
+<div class="container">
 
-  <h1>🚀 Strategy Backtest</h1>
+<h2>Backtest</h2>
 
-  <div class="controls">
-    <select id="days">
-      <option value="5">5 Days</option>
-      <option value="10">10 Days</option>
-      <option value="15">15 Days</option>
-      <option value="20">20 Days</option>
-      <option value="30" selected>30 Days</option>
-    </select>
+<select id="days">
+<option value="5">5</option>
+<option value="10">10</option>
+<option value="30" selected>30</option>
+</select>
 
-    <button onclick="run()">⚡ Run</button>
-  </div>
+<button onclick="run()">Run</button>
 
-  <div id="stats"></div>
-  <div id="analysis"></div>
-
-  <h2>📦 Trades</h2>
-  <div id="trades"></div>
+<div id="output"></div>
 
 </div>
 
-<script type="module">
+<script>
 
 const API = "https://backtest-only.vercel.app/api/backtest?days=";
 
-// ======================
-// 🚀 MAIN
-// ======================
 async function run() {
+  const days = document.getElementById("days").value;
+
+  const res = await fetch(API + days);
+  const text = await res.text();
+
+  console.log("RAW:", text);
+
+  const trades = extractTrades(text);
+
+  render(trades);
+}
+
+// ============================
+// 🔥 CORE FIX
+// ============================
+function extractTrades(text) {
+
   try {
-    const days = document.getElementById("days").value;
+    // find all trade objects manually
+    const matches = text.match(/\{[^{}]*"entry"[^{}]*\}/g);
 
-    const res = await fetch(API + days);
-    const text = await res.text();
+    if (!matches) return [];
 
-    const data = normalize(text);
+    return matches.map(x => {
+      try { return JSON.parse(x); }
+      catch { return null; }
+    }).filter(Boolean);
 
-    if (!data.trades.length) {
-      showError("No trades found");
-      return;
-    }
-
-    renderStats(data.summary);
-    renderTrades(data.trades);
-    renderAnalysis(data.trades, data.summary);
-
-  } catch (e) {
-    console.error(e);
-    showError("API failed or parse error");
+  } catch {
+    return [];
   }
 }
 
-// ======================
-// 🔥 ADAPTER (CRITICAL)
-// ======================
-function normalize(text) {
-  try {
-    let json = JSON.parse(text);
+// ============================
+// UI
+// ============================
+function render(trades) {
 
-    let trades = json.trades;
-
-    // fix if string
-    if (typeof trades === "string") {
-      try {
-        trades = JSON.parse(trades);
-      } catch {
-        trades = [];
-      }
-    }
-
-    return {
-      summary: json.summary || {},
-      trades: trades || []
-    };
-
-  } catch (e) {
-    console.error("Parse failed", e);
-    return { summary: {}, trades: [] };
-  }
-}
-
-// ======================
-// 📊 STATS
-// ======================
-function renderStats(s) {
-  document.getElementById("stats").innerHTML = `
-    <div class="stats">
-      <div class="stat">Total<br>${s.total || 0}</div>
-      <div class="stat">Wins<br>${s.wins || 0}</div>
-      <div class="stat">Losses<br>${s.losses || 0}</div>
-      <div class="stat">Winrate<br>${s.winrate || 0}%</div>
-    </div>
-  `;
-}
-
-// ======================
-// 📦 TRADES
-// ======================
-function renderTrades(trades) {
-  const el = document.getElementById("trades");
+  const el = document.getElementById("output");
   el.innerHTML = "";
+
+  if (!trades.length) {
+    el.innerHTML = "❌ No trades parsed";
+    return;
+  }
 
   trades.forEach(t => {
 
     const pnl =
       t.dir === "CALL"
-        ? (t.exitPrice - t.entry)
-        : (t.entry - t.exitPrice);
-
-    const cls = t.exitType === "TP" ? "win" : "loss";
+        ? t.exitPrice - t.entry
+        : t.entry - t.exitPrice;
 
     const div = document.createElement("div");
-    div.className = `card ${cls}`;
+    div.className = "card " + (t.exitType === "TP" ? "win" : "loss");
 
     div.innerHTML = `
-      <b>${t.dir} (${t.market})</b><br/>
-      🟢 Entry: ${t.entry}<br/>
-      🔴 Exit: ${t.exitPrice}<br/>
-      ⏱ ${t.entryTime} → ${t.exitTime}<br/>
-      📉 SL: ${t.sl}<br/>
-      🎯 RR: ${t.rr}<br/>
-      💰 PnL: ${pnl.toFixed(2)} pts
+      <b>${t.dir}</b><br>
+      Entry: ${t.entry}<br>
+      Exit: ${t.exitPrice}<br>
+      PnL: ${pnl.toFixed(2)}
     `;
 
     el.appendChild(div);
   });
-}
-
-// ======================
-// 📈 ANALYSIS
-// ======================
-function renderAnalysis(trades, summary) {
-
-  let equity = 0, peak = 0, dd = 0, total = 0;
-
-  trades.forEach(t => {
-    const pnl =
-      t.dir === "CALL"
-        ? (t.exitPrice - t.entry)
-        : (t.entry - t.exitPrice);
-
-    equity += pnl;
-    total += pnl;
-
-    if (equity > peak) peak = equity;
-
-    const draw = peak - equity;
-    if (draw > dd) dd = draw;
-  });
-
-  const yearly = summary.days
-    ? (total / summary.days) * 365
-    : 0;
-
-  document.getElementById("analysis").innerHTML = `
-    <div class="analysis">
-      📊 Total Points: ${total.toFixed(2)}<br/>
-      📉 Max Drawdown: ${dd.toFixed(2)}<br/>
-      🚀 Year Projection: ${yearly.toFixed(2)} pts
-    </div>
-  `;
-}
-
-// ======================
-// ❌ ERROR
-// ======================
-function showError(msg) {
-  document.getElementById("trades").innerHTML =
-    `<div class="error">❌ ${msg}</div>`;
 }
 
 </script>
