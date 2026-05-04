@@ -15,6 +15,7 @@
 
     h1 {
       color: #00ffae;
+      font-size: 26px;
     }
 
     select, button {
@@ -22,11 +23,13 @@
       border-radius: 8px;
       border: none;
       margin: 5px;
+      font-size: 14px;
     }
 
     button {
       background: #00ffae;
       cursor: pointer;
+      font-weight: bold;
     }
 
     .summary {
@@ -34,11 +37,13 @@
       padding: 15px;
       border-radius: 12px;
       margin-top: 15px;
+      font-size: 14px;
+      line-height: 1.6;
     }
 
     .grid {
       display: grid;
-      gap: 10px;
+      gap: 12px;
       margin-top: 15px;
     }
 
@@ -46,7 +51,8 @@
       padding: 15px;
       border-radius: 12px;
       background: #1c2541;
-      border-left: 5px solid gray;
+      border-left: 6px solid gray;
+      line-height: 1.5;
     }
 
     .win {
@@ -79,6 +85,13 @@
   <div id="trades" class="grid"></div>
 </div><script>
 
+function formatTime(t) {
+  if (!t) return "N/A";
+  return new Date(t).toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata"
+  });
+}
+
 async function run() {
   const days = document.getElementById("days").value;
 
@@ -86,7 +99,6 @@ async function run() {
   document.getElementById("trades").innerHTML = "";
   document.getElementById("summary").innerHTML = "";
 
-  // ✅ DIRECT API CALL (NO PROXY)
   const url = "https://backtest-only.vercel.app/api/backtest?days=" + days;
 
   try {
@@ -124,34 +136,42 @@ async function run() {
 
     document.getElementById("summary").innerHTML = `
       <div class="summary">
-        Total: ${data.total} |
-        Wins: ${data.wins} |
-        Loss: ${data.losses} |
-        Winrate: ${data.winrate}% <br><br>
+        <b>Total Trades:</b> ${data.total} <br>
+        <b>Wins:</b> ${data.wins} |
+        <b>Loss:</b> ${data.losses} |
+        <b>Winrate:</b> ${data.winrate}% <br><br>
 
-        Win Points: ${winPoints.toFixed(2)} <br>
-        Loss Points: ${lossPoints.toFixed(2)} <br>
-        Net Points: ${net.toFixed(2)} <br>
-        Max Drawdown: ${maxDD.toFixed(2)}
+        <b>Win Points:</b> ${winPoints.toFixed(2)} <br>
+        <b>Loss Points:</b> ${lossPoints.toFixed(2)} <br>
+        <b>Net Points:</b> ${net.toFixed(2)} <br>
+        <b>Max Drawdown:</b> ${maxDD.toFixed(2)}
       </div>
     `;
 
     trades.forEach(t => {
+
       const points = (t.exitType === "TP")
         ? Math.abs(t.exitPrice - t.entry)
         : -Math.abs(t.exitPrice - t.entry);
+
+      const entryTime = formatTime(t.entryTime);
+      const exitTime = formatTime(t.exitTime);
 
       const card = document.createElement("div");
 
       card.className = "card " + (points > 0 ? "win" : "loss");
 
       card.innerHTML = `
-        <b>${t.dir} | ${t.market}</b><br>
-        Entry: ${t.entry}<br>
-        Exit: ${t.exitPrice}<br>
-        RR: ${t.rr}<br>
-        Points: ${points.toFixed(2)}<br>
-        Time: ${t.entryTime}
+        <b>${t.dir} | ${t.market}</b><br><br>
+
+        📥 Entry Price: ${t.entry}<br>
+        ⏱ Entry Time: ${entryTime}<br><br>
+
+        📤 Exit Price: ${t.exitPrice}<br>
+        ⏱ Exit Time: ${exitTime}<br><br>
+
+        🎯 RR: ${t.rr}<br>
+        📊 Points: ${points.toFixed(2)}
       `;
 
       document.getElementById("trades").appendChild(card);
