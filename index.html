@@ -3,13 +3,98 @@
 <head>
   <meta charset="UTF-8" />
   <title>Backtest Pro</title>
-  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI';
+      background: linear-gradient(135deg, #020617, #0f172a);
+      color: #e2e8f0;
+    }
+
+    .app {
+      max-width: 1100px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    select, button {
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+    }
+
+    button {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .stat {
+      background: #020617;
+      padding: 12px;
+      border-radius: 10px;
+      text-align: center;
+      border: 1px solid #1e293b;
+    }
+
+    .analysis {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #020617;
+      border-radius: 10px;
+      border: 1px solid #1e293b;
+    }
+
+    .card {
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+
+    .win {
+      border-left: 5px solid #22c55e;
+    }
+
+    .loss {
+      border-left: 5px solid #ef4444;
+    }
+
+    .error {
+      color: red;
+      text-align: center;
+      margin-top: 20px;
+    }
+  </style>
 </head>
+
 <body>
 
 <div class="app">
 
-  <h1>🚀 Strategy Dashboard</h1>
+  <h1>🚀 Strategy Backtest</h1>
 
   <div class="controls">
     <select id="days">
@@ -20,7 +105,7 @@
       <option value="30" selected>30 Days</option>
     </select>
 
-    <button onclick="run()">⚡ Run Backtest</button>
+    <button onclick="run()">⚡ Run</button>
   </div>
 
   <div id="stats"></div>
@@ -31,6 +116,157 @@
 
 </div>
 
-<script src="app.js"></script>
+<script type="module">
+
+const API = "https://backtest-only.vercel.app/api/backtest?days=";
+
+// ======================
+// 🚀 MAIN
+// ======================
+async function run() {
+  try {
+    const days = document.getElementById("days").value;
+
+    const res = await fetch(API + days);
+    const text = await res.text();
+
+    const data = normalize(text);
+
+    if (!data.trades.length) {
+      showError("No trades found");
+      return;
+    }
+
+    renderStats(data.summary);
+    renderTrades(data.trades);
+    renderAnalysis(data.trades, data.summary);
+
+  } catch (e) {
+    console.error(e);
+    showError("API failed or parse error");
+  }
+}
+
+// ======================
+// 🔥 ADAPTER (CRITICAL)
+// ======================
+function normalize(text) {
+  try {
+    let json = JSON.parse(text);
+
+    let trades = json.trades;
+
+    // fix if string
+    if (typeof trades === "string") {
+      try {
+        trades = JSON.parse(trades);
+      } catch {
+        trades = [];
+      }
+    }
+
+    return {
+      summary: json.summary || {},
+      trades: trades || []
+    };
+
+  } catch (e) {
+    console.error("Parse failed", e);
+    return { summary: {}, trades: [] };
+  }
+}
+
+// ======================
+// 📊 STATS
+// ======================
+function renderStats(s) {
+  document.getElementById("stats").innerHTML = `
+    <div class="stats">
+      <div class="stat">Total<br>${s.total || 0}</div>
+      <div class="stat">Wins<br>${s.wins || 0}</div>
+      <div class="stat">Losses<br>${s.losses || 0}</div>
+      <div class="stat">Winrate<br>${s.winrate || 0}%</div>
+    </div>
+  `;
+}
+
+// ======================
+// 📦 TRADES
+// ======================
+function renderTrades(trades) {
+  const el = document.getElementById("trades");
+  el.innerHTML = "";
+
+  trades.forEach(t => {
+
+    const pnl =
+      t.dir === "CALL"
+        ? (t.exitPrice - t.entry)
+        : (t.entry - t.exitPrice);
+
+    const cls = t.exitType === "TP" ? "win" : "loss";
+
+    const div = document.createElement("div");
+    div.className = `card ${cls}`;
+
+    div.innerHTML = `
+      <b>${t.dir} (${t.market})</b><br/>
+      🟢 Entry: ${t.entry}<br/>
+      🔴 Exit: ${t.exitPrice}<br/>
+      ⏱ ${t.entryTime} → ${t.exitTime}<br/>
+      📉 SL: ${t.sl}<br/>
+      🎯 RR: ${t.rr}<br/>
+      💰 PnL: ${pnl.toFixed(2)} pts
+    `;
+
+    el.appendChild(div);
+  });
+}
+
+// ======================
+// 📈 ANALYSIS
+// ======================
+function renderAnalysis(trades, summary) {
+
+  let equity = 0, peak = 0, dd = 0, total = 0;
+
+  trades.forEach(t => {
+    const pnl =
+      t.dir === "CALL"
+        ? (t.exitPrice - t.entry)
+        : (t.entry - t.exitPrice);
+
+    equity += pnl;
+    total += pnl;
+
+    if (equity > peak) peak = equity;
+
+    const draw = peak - equity;
+    if (draw > dd) dd = draw;
+  });
+
+  const yearly = summary.days
+    ? (total / summary.days) * 365
+    : 0;
+
+  document.getElementById("analysis").innerHTML = `
+    <div class="analysis">
+      📊 Total Points: ${total.toFixed(2)}<br/>
+      📉 Max Drawdown: ${dd.toFixed(2)}<br/>
+      🚀 Year Projection: ${yearly.toFixed(2)} pts
+    </div>
+  `;
+}
+
+// ======================
+// ❌ ERROR
+// ======================
+function showError(msg) {
+  document.getElementById("trades").innerHTML =
+    `<div class="error">❌ ${msg}</div>`;
+}
+
+</script>
+
 </body>
 </html>
