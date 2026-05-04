@@ -1,4 +1,4 @@
-const API = "https://backtest-only.vercel.app/api/backtest?days=";
+const API = "https://backtest-only.vercel.app/api/backtest?days=30";
 
 async function run() {
   const days = document.getElementById("days").value;
