@@ -1,103 +1,101 @@
-const BASE_URL = "https://backtest-only.vercel.app/api/backtest?days=";
+const API = "https://backtest-only.vercel.app/api/backtest?days=";
 
-async function runBacktest() {
+async function run() {
   const days = document.getElementById("days").value;
 
-  const res = await fetch(BASE_URL + days);
-  const data = await res.json();
+  const res = await fetch(API + days);
+  const raw = await res.json();
 
-  renderSummary(data.summary);
-  renderTrades(data.trades);
-  renderAnalysis(data.trades, data.summary);
+  // 🔥 FIX: parse trades if string
+  let trades = raw.trades;
+
+  if (typeof trades === "string") {
+    try {
+      trades = JSON.parse(trades);
+    } catch {
+      console.error("Parse error");
+      trades = [];
+    }
+  }
+
+  renderStats(raw.summary);
+  renderTrades(trades);
+  renderAnalysis(trades, raw.summary);
 }
 
-// ================================
-// 📊 SUMMARY
-// ================================
-function renderSummary(s) {
-  document.getElementById("summary").innerHTML = `
-    <div class="summary">
-      <b>Total:</b> ${s.total} |
-      <b>Wins:</b> ${s.wins} |
-      <b>Losses:</b> ${s.losses} |
-      <b>Winrate:</b> ${s.winrate}%
+// ====================
+// 📊 STATS
+// ====================
+function renderStats(s) {
+  document.getElementById("stats").innerHTML = `
+    <div class="stats">
+      <div class="stat">Total<br>${s.total}</div>
+      <div class="stat">Wins<br>${s.wins}</div>
+      <div class="stat">Losses<br>${s.losses}</div>
+      <div class="stat">Winrate<br>${s.winrate}%</div>
     </div>
   `;
 }
 
-// ================================
+// ====================
 // 📦 TRADES
-// ================================
+// ====================
 function renderTrades(trades) {
-  const container = document.getElementById("trades");
-  container.innerHTML = "";
-
-  trades.forEach(t => {
-    const pnlPoints =
-      t.dir === "CALL"
-        ? (t.exitPrice - t.entry)
-        : (t.entry - t.exitPrice);
-
-    const cls = t.exitType === "TP" ? "win" : "loss";
-
-    const el = document.createElement("div");
-    el.className = `card ${cls}`;
-
-    el.innerHTML = `
-      <b>${t.dir}</b> | ${t.market}<br/>
-      Entry: ${t.entry} (${t.entryTime})<br/>
-      Exit: ${t.exitPrice} (${t.exitTime})<br/>
-      SL: ${t.sl}<br/>
-      RR: ${t.rr}<br/>
-      PnL: ${pnlPoints.toFixed(2)} pts
-    `;
-
-    container.appendChild(el);
-  });
-}
-
-// ================================
-// 📈 ANALYSIS ENGINE
-// ================================
-function renderAnalysis(trades, summary) {
-  let equity = 0;
-  let peak = 0;
-  let maxDD = 0;
-
-  let totalPts = 0;
-  let wins = 0;
-  let losses = 0;
+  const el = document.getElementById("trades");
+  el.innerHTML = "";
 
   trades.forEach(t => {
     const pnl =
       t.dir === "CALL"
-        ? (t.exitPrice - t.entry)
-        : (t.entry - t.exitPrice);
+        ? t.exitPrice - t.entry
+        : t.entry - t.exitPrice;
+
+    const cls = t.exitType === "TP" ? "win" : "loss";
+
+    const div = document.createElement("div");
+    div.className = `card ${cls}`;
+
+    div.innerHTML = `
+      <b>${t.dir} (${t.market})</b><br/>
+      🟢 Entry: ${t.entry}<br/>
+      🔴 Exit: ${t.exitPrice}<br/>
+      ⏱ ${t.entryTime} → ${t.exitTime}<br/>
+      📉 SL: ${t.sl}<br/>
+      🎯 RR: ${t.rr}<br/>
+      💰 PnL: ${pnl.toFixed(2)} pts
+    `;
+
+    el.appendChild(div);
+  });
+}
+
+// ====================
+// 📈 ANALYSIS
+// ====================
+function renderAnalysis(trades, summary) {
+  let equity = 0, peak = 0, dd = 0, total = 0;
+
+  trades.forEach(t => {
+    const pnl =
+      t.dir === "CALL"
+        ? t.exitPrice - t.entry
+        : t.entry - t.exitPrice;
 
     equity += pnl;
-    totalPts += pnl;
+    total += pnl;
 
     if (equity > peak) peak = equity;
-
-    const dd = peak - equity;
-    if (dd > maxDD) maxDD = dd;
-
-    if (pnl > 0) wins++;
-    else losses++;
+    const d = peak - equity;
+    if (d > dd) dd = d;
   });
 
-  const avgWin = totalPts / trades.length;
-
-  // 365 projection
-  const dailyAvg = totalPts / summary.days;
-  const yearly = dailyAvg * 365;
+  const yearly = (total / summary.days) * 365;
 
   document.getElementById("analysis").innerHTML = `
     <div class="analysis">
-      <b>Total Points:</b> ${totalPts.toFixed(2)}<br/>
-      <b>Avg per Trade:</b> ${avgWin.toFixed(2)} pts<br/>
-      <b>Max Drawdown:</b> ${maxDD.toFixed(2)} pts<br/>
-      <b>365 Projection:</b> ${yearly.toFixed(2)} pts<br/>
+      📊 Total Points: ${total.toFixed(2)}<br/>
+      📉 Max DD: ${dd.toFixed(2)}<br/>
+      🚀 Year Projection: ${yearly.toFixed(2)} pts
     </div>
   `;
 }
