@@ -1,15 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Backtest Dashboard</title>
-
-  <style>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />  <style>
     body {
       margin: 0;
       font-family: Arial;
-      background: #0b1220;
+      background: #0b132b;
       color: white;
     }
 
@@ -18,165 +14,158 @@
     }
 
     h1 {
-      color: #00ffa3;
-    }
-
-    .controls {
-      margin: 15px 0;
+      color: #00ffae;
+      font-size: 28px;
     }
 
     select, button {
-      padding: 8px;
-      font-size: 14px;
-      border-radius: 5px;
+      padding: 10px;
+      border-radius: 8px;
       border: none;
+      margin: 5px;
+      font-size: 16px;
     }
 
     button {
-      background: #00ffa3;
+      background: #00ffae;
       cursor: pointer;
     }
 
+    .summary {
+      background: #1c2541;
+      padding: 15px;
+      border-radius: 12px;
+      margin-top: 15px;
+      font-size: 14px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
     .card {
-      background: #121a2b;
-      margin: 10px 0;
-      padding: 12px;
-      border-radius: 10px;
-      border-left: 5px solid #00ffa3;
+      padding: 15px;
+      border-radius: 12px;
+      background: #1c2541;
+      border-left: 5px solid gray;
     }
 
-    .win { border-color: #00ff88; }
-    .loss { border-color: #ff4d4d; }
-
-    .stats {
-      margin: 15px 0;
-      padding: 10px;
-      background: #1a2238;
-      border-radius: 8px;
+    .win {
+      border-left-color: #00ffae;
     }
 
-    #debug {
-      white-space: pre-wrap;
-      font-size: 11px;
-      color: #ccc;
+    .loss {
+      border-left-color: #ff4d4d;
+    }
+
+    .loading {
       margin-top: 10px;
+      padding: 10px;
+      background: #1c2541;
+      border-radius: 10px;
     }
-  </style>
-</head>
+  </style></head><body><div class="container">
+  <h1>📊 Strategy Backtest</h1>Days:
+<select id="days">
+<option>5</option>
+<option>10</option>
+<option>15</option>
+<option selected>30</option>
+</select>
 
-<body>
-<div class="container">
+<button onclick="run()">Run</button>
 
-  <h1>📊 Strategy Backtest</h1>
-
-  <div class="controls">
-    Days:
-    <select id="days">
-      <option>5</option>
-      <option>10</option>
-      <option>15</option>
-      <option selected>30</option>
-    </select>
-
-    <button onclick="run()">Run</button>
-  </div>
-
-  <div id="stats" class="stats"></div>
-  <div id="trades"></div>
-
-  <div id="debug"></div>
-
-</div>
-
-<script>
-function log(msg) {
-  document.getElementById("debug").innerText += msg + "\n";
-}
+  <div id="loading" class="loading"></div>
+  <div id="summary"></div>
+  <div id="trades" class="grid"></div>
+</div><script>
 
 async function run() {
   const days = document.getElementById("days").value;
 
+  document.getElementById("loading").innerText = "Loading...";
   document.getElementById("trades").innerHTML = "";
-  document.getElementById("stats").innerHTML = "Loading...";
-  document.getElementById("debug").innerText = "";
+  document.getElementById("summary").innerHTML = "";
 
   const url = "https://api.allorigins.win/raw?url=" +
-  encodeURIComponent("https://backtest-only.vercel.app/api/backtest?days=" + days);
-
-fetch(url)
-  log("Fetching: " + url);
+    encodeURIComponent("https://backtest-only.vercel.app/api/backtest?days=" + days);
 
   try {
     const res = await fetch(url);
-    const text = await res.text();
+    const data = await res.json();
 
-    log("RAW RESPONSE:");
-    log(text.substring(0, 500));
+    document.getElementById("loading").innerText = "";
 
-    let data;
+    const trades = data.trades || [];
 
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      log("❌ JSON ERROR");
-      return;
-    }
+    let totalWinPoints = 0;
+    let totalLossPoints = 0;
+    let equity = 0;
+    let peak = 0;
+    let maxDD = 0;
 
-    if (!data.trades) {
-      log("❌ No trades found");
-      return;
-    }
+    trades.forEach(t => {
+      const points = Math.abs(t.exitPrice - t.entry);
 
-    render(data);
+      if (t.exitType === "TP") {
+        totalWinPoints += points;
+        equity += points;
+      } else {
+        totalLossPoints += points;
+        equity -= points;
+      }
 
-  } catch (err) {
-    log("❌ FETCH ERROR: " + err);
+      if (equity > peak) peak = equity;
+
+      const dd = peak - equity;
+      if (dd > maxDD) maxDD = dd;
+    });
+
+    const net = totalWinPoints - totalLossPoints;
+
+    document.getElementById("summary").innerHTML = `
+      <div class="summary">
+        <b>Total:</b> ${data.total} |
+        <b>Wins:</b> ${data.wins} |
+        <b>Loss:</b> ${data.losses} |
+        <b>Winrate:</b> ${data.winrate}% <br><br>
+
+        <b>Win Points:</b> ${totalWinPoints.toFixed(2)} <br>
+        <b>Loss Points:</b> ${totalLossPoints.toFixed(2)} <br>
+        <b>Net Points:</b> ${net.toFixed(2)} <br>
+        <b>Max Drawdown:</b> ${maxDD.toFixed(2)}
+      </div>
+    `;
+
+    trades.forEach(t => {
+      const points = (t.exitType === "TP")
+        ? Math.abs(t.exitPrice - t.entry)
+        : -Math.abs(t.exitPrice - t.entry);
+
+      const card = document.createElement("div");
+
+      card.className = "card " + (points > 0 ? "win" : "loss");
+
+      card.innerHTML = `
+        <b>${t.dir} | ${t.market}</b><br>
+        Entry: ${t.entry}<br>
+        Exit: ${t.exitPrice}<br>
+        RR: ${t.rr}<br>
+        Points: ${points.toFixed(2)}<br>
+        Time: ${t.entryTime}
+      `;
+
+      document.getElementById("trades").appendChild(card);
+    });
+
+  } catch (e) {
+    document.getElementById("loading").innerText = "Error loading data";
+    console.log(e);
   }
 }
 
-function render(data) {
-  const trades = data.trades;
-  const container = document.getElementById("trades");
-
-  let total = trades.length;
-  let wins = 0;
-  let losses = 0;
-
-  trades.forEach(t => {
-    const isWin = t.exitType === "TP";
-    if (isWin) wins++; else losses++;
-
-    const card = document.createElement("div");
-    card.className = "card " + (isWin ? "win" : "loss");
-
-    const entry = t.entry || t.entryPrice;
-    const exit = t.exitPrice;
-
-    const points = (exit - entry).toFixed(2);
-
-    card.innerHTML = `
-      <b>${t.dir}</b> | ${t.market}<br>
-      Entry: ${entry}<br>
-      Exit: ${exit}<br>
-      SL: ${t.sl}<br>
-      RR: ${t.rr}<br>
-      Points: ${points}<br>
-      Time: ${t.entryTime}
-    `;
-
-    container.appendChild(card);
-  });
-
-  const winrate = ((wins / total) * 100).toFixed(2);
-
-  document.getElementById("stats").innerHTML = `
-    Total: ${total} |
-    Wins: ${wins} |
-    Loss: ${losses} |
-    Winrate: ${winrate}%
-  `;
-}
-</script>
-
-</body>
+</script></body>
 </html>
