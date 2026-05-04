@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Backtest Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="container">
+    <h1>📊 Strategy Backtest</h1>
+
+    <div class="controls">
+      <label>Select Days:</label>
+      <select id="days">
+        <option value="5">5</option>
+        <option value="10">10</option>
+        <option value="15">15</option>
+        <option value="20">20</option>
+        <option value="30" selected>30</option>
+      </select>
+
+      <button onclick="runBacktest()">Run</button>
+    </div>
+
+    <div id="summary"></div>
+    <div id="analysis"></div>
+
+    <h2>Trades</h2>
+    <div id="trades"></div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
