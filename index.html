@@ -1,126 +1,179 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Backtest FIXED</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Backtest Dashboard</title>
 
-<style>
-body {
-  background:#0f172a;
-  color:white;
-  font-family:Arial;
-}
-.container {
-  max-width:900px;
-  margin:auto;
-  padding:20px;
-}
-button {
-  padding:10px;
-  background:#22c55e;
-  border:none;
-  color:white;
-}
-.card {
-  background:#1e293b;
-  padding:10px;
-  margin:10px 0;
-}
-.win { border-left:5px solid green; }
-.loss { border-left:5px solid red; }
-</style>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      background: #0b1220;
+      color: white;
+    }
 
+    .container {
+      padding: 20px;
+    }
+
+    h1 {
+      color: #00ffa3;
+    }
+
+    .controls {
+      margin: 15px 0;
+    }
+
+    select, button {
+      padding: 8px;
+      font-size: 14px;
+      border-radius: 5px;
+      border: none;
+    }
+
+    button {
+      background: #00ffa3;
+      cursor: pointer;
+    }
+
+    .card {
+      background: #121a2b;
+      margin: 10px 0;
+      padding: 12px;
+      border-radius: 10px;
+      border-left: 5px solid #00ffa3;
+    }
+
+    .win { border-color: #00ff88; }
+    .loss { border-color: #ff4d4d; }
+
+    .stats {
+      margin: 15px 0;
+      padding: 10px;
+      background: #1a2238;
+      border-radius: 8px;
+    }
+
+    #debug {
+      white-space: pre-wrap;
+      font-size: 11px;
+      color: #ccc;
+      margin-top: 10px;
+    }
+  </style>
 </head>
-<body>
 
+<body>
 <div class="container">
 
-<h2>Backtest</h2>
+  <h1>📊 Strategy Backtest</h1>
 
-<select id="days">
-<option value="5">5</option>
-<option value="10">10</option>
-<option value="30" selected>30</option>
-</select>
+  <div class="controls">
+    Days:
+    <select id="days">
+      <option>5</option>
+      <option>10</option>
+      <option>15</option>
+      <option selected>30</option>
+    </select>
 
-<button onclick="run()">Run</button>
+    <button onclick="run()">Run</button>
+  </div>
 
-<div id="output"></div>
+  <div id="stats" class="stats"></div>
+  <div id="trades"></div>
+
+  <div id="debug"></div>
 
 </div>
 
 <script>
-
-const API = "https://backtest-only.vercel.app/api/backtest?days=";
+function log(msg) {
+  document.getElementById("debug").innerText += msg + "\n";
+}
 
 async function run() {
   const days = document.getElementById("days").value;
 
-  const res = await fetch(API + days);
-  const text = await res.text();
+  document.getElementById("trades").innerHTML = "";
+  document.getElementById("stats").innerHTML = "Loading...";
+  document.getElementById("debug").innerText = "";
 
-  console.log("RAW:", text);
+  const url = `https://backtest-only.vercel.app/api/backtest?days=${days}`;
 
-  const trades = extractTrades(text);
-
-  render(trades);
-}
-
-// ============================
-// 🔥 CORE FIX
-// ============================
-function extractTrades(text) {
+  log("Fetching: " + url);
 
   try {
-    // find all trade objects manually
-    const matches = text.match(/\{[^{}]*"entry"[^{}]*\}/g);
+    const res = await fetch(url);
+    const text = await res.text();
 
-    if (!matches) return [];
+    log("RAW RESPONSE:");
+    log(text.substring(0, 500));
 
-    return matches.map(x => {
-      try { return JSON.parse(x); }
-      catch { return null; }
-    }).filter(Boolean);
+    let data;
 
-  } catch {
-    return [];
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      log("❌ JSON ERROR");
+      return;
+    }
+
+    if (!data.trades) {
+      log("❌ No trades found");
+      return;
+    }
+
+    render(data);
+
+  } catch (err) {
+    log("❌ FETCH ERROR: " + err);
   }
 }
 
-// ============================
-// UI
-// ============================
-function render(trades) {
+function render(data) {
+  const trades = data.trades;
+  const container = document.getElementById("trades");
 
-  const el = document.getElementById("output");
-  el.innerHTML = "";
-
-  if (!trades.length) {
-    el.innerHTML = "❌ No trades parsed";
-    return;
-  }
+  let total = trades.length;
+  let wins = 0;
+  let losses = 0;
 
   trades.forEach(t => {
+    const isWin = t.exitType === "TP";
+    if (isWin) wins++; else losses++;
 
-    const pnl =
-      t.dir === "CALL"
-        ? t.exitPrice - t.entry
-        : t.entry - t.exitPrice;
+    const card = document.createElement("div");
+    card.className = "card " + (isWin ? "win" : "loss");
 
-    const div = document.createElement("div");
-    div.className = "card " + (t.exitType === "TP" ? "win" : "loss");
+    const entry = t.entry || t.entryPrice;
+    const exit = t.exitPrice;
 
-    div.innerHTML = `
-      <b>${t.dir}</b><br>
-      Entry: ${t.entry}<br>
-      Exit: ${t.exitPrice}<br>
-      PnL: ${pnl.toFixed(2)}
+    const points = (exit - entry).toFixed(2);
+
+    card.innerHTML = `
+      <b>${t.dir}</b> | ${t.market}<br>
+      Entry: ${entry}<br>
+      Exit: ${exit}<br>
+      SL: ${t.sl}<br>
+      RR: ${t.rr}<br>
+      Points: ${points}<br>
+      Time: ${t.entryTime}
     `;
 
-    el.appendChild(div);
+    container.appendChild(card);
   });
-}
 
+  const winrate = ((wins / total) * 100).toFixed(2);
+
+  document.getElementById("stats").innerHTML = `
+    Total: ${total} |
+    Wins: ${wins} |
+    Loss: ${losses} |
+    Winrate: ${winrate}%
+  `;
+}
 </script>
 
 </body>
